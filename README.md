@@ -44,7 +44,7 @@ cd rzv_ai_apps/11_Head_count_topview/
 To get the patch file, clone this repository using the following command:
 ```sh
 cd ../..  # Navigate back to the base directory of rzv_ai_apps
-git clone https://github.com/other-repo/patches.git
+git clone https://github.com/Ignitarium-Renesas/Kakip_RZV2H_Demos.git
 ```
 
 ## 3. Apply the Patch File
