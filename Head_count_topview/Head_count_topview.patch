@@ -1,5 +1,37 @@
+diff --git a/11_Head_count_topview/src/define.h b/11_Head_count_topview/src/define.h
+index 5dcf76f..18353ea 100644
+--- a/11_Head_count_topview/src/define.h
++++ b/11_Head_count_topview/src/define.h
+@@ -127,24 +127,14 @@ const static double anchors[] =
+ 
+ /*Image:: Text information to be drawn on image*/
+ 
+-#define HEAD_COUNT_STR_X            (645)
++#define HEAD_COUNT_STR_X            (30)
+ #define HEAD_COUNT_STR_Y            (30)
+-#define FPS_STR_X                   (645)
+-#define FPS_STR_Y                   (360)
+-#define PRE_TIME_STR_X              (645)
+-#define PRE_TIME_STR_Y              (170)
+-#define P_TIME_STR_X                (645)
+-#define P_TIME_STR_Y                (270)
+-#define I_TIME_STR_X                (645)
+-#define I_TIME_STR_Y                (220)
+-#define T_TIME_STR_X                (645)
+-#define T_TIME_STR_Y                (120)
+-#define CHAR_SCALE_LARGE            (1.6)
++#define CHAR_SCALE_LARGE            (0.9)
+ #define CHAR_SCALE_SMALL            (1.2)
+ #define CHAR_SCALE_XS               (0.5)
+ #define BOX_THICKNESS               (2)
+ #define BOX_CHAR_THICKNESS          (0.5)
+-#define HC_CHAR_THICKNESS           (4)
++#define HC_CHAR_THICKNESS           (2)
+ #define FPS_CHAR_THICKNESS          (4)
+ #define RIGHT_ALIGN_OFFSET          (20)
+ 
 diff --git a/11_Head_count_topview/src/head_count_topview.cpp b/11_Head_count_topview/src/head_count_topview.cpp
-index 564257d..6585939 100644
+index 564257d..074dc48 100644
 --- a/11_Head_count_topview/src/head_count_topview.cpp
 +++ b/11_Head_count_topview/src/head_count_topview.cpp
 @@ -38,7 +38,6 @@
@@ -158,10 +190,10 @@ index 564257d..6585939 100644
              str = stream.str();
 -            Size count_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_LARGE, HC_CHAR_THICKNESS, &baseline);
 -            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - count_size.width - RIGHT_ALIGN_OFFSET), (HEAD_COUNT_STR_Y + count_size.height)), FONT_HERSHEY_SIMPLEX, 
-+            putText(g_frame, str,Point(30,30), FONT_HERSHEY_SIMPLEX, 
++            putText(g_frame, str,Point(HEAD_COUNT_STR_X, HEAD_COUNT_STR_Y), FONT_HERSHEY_SIMPLEX, 
                          CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
 -            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - count_size.width - RIGHT_ALIGN_OFFSET), (HEAD_COUNT_STR_Y + count_size.height)), FONT_HERSHEY_SIMPLEX, 
-+            putText(g_frame, str,Point(30,30), FONT_HERSHEY_SIMPLEX, 
++            putText(g_frame, str,Point(HEAD_COUNT_STR_X, HEAD_COUNT_STR_Y), FONT_HERSHEY_SIMPLEX, 
                          CHAR_SCALE_LARGE, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
  
 -            stream.str("");
@@ -306,7 +338,7 @@ index 564257d..6585939 100644
              std::cout << "[INFO] USB CAMERA \n";
              media_port = query_device_status("usb");
              gstreamer_pipeline = "v4l2src device=" + media_port + " ! video/x-raw, width=640, height=480 ! videoconvert ! appsink";
-@@ -1044,8 +982,7 @@ end_threads:
+@@ -1044,7 +982,6 @@ end_threads:
          sem_destroy(&terminate_req_sem);
      }
      /* Exit the program */
@@ -314,6 +346,3 @@ index 564257d..6585939 100644
      close(drpai_fd);
      return 0;
  
--}
-\ No newline at end of file
-+}
