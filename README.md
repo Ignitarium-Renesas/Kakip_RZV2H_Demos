@@ -52,38 +52,9 @@ Apply the provided patch file to the application using the command below:
 
 ```sh
 cd rzv_ai_apps/11_Head_count_topview/
-patch -p0 < ../../Kakip_RZV2H_Demos/Head_count_topview/Head_count_topview.patch
+git apply ../../Kakip_RZV2H_Demos/Head_count_topview/Head_count_topview.patch
 ```
-## 4. Copy the Object File
-Copy the prebuilt object file from this repository to the application executable folder. This step is required to use the application without recompilation.
-```sh
-cp -r ../../Kakip_RZV2H_Demos/Head_count_topview/head_count_topview_app exe_v2h
-```
-
-## 5. Run the Application
-To run the application on the Kakip board:
-
-Execute the application with the following command, specifying either USB camera or IMAGE input mode:
-
-- **Image Input**:
-    ```sh
-    ./head_count_topview_app IMAGE ../img/sample.jpeg
-    ```
-
-- **USB Camera Input**:
-    ```sh
-    ./head_count_topview_app USB
-    ```
-
-Following window shows up on HDMI screen.
-<img src="./Head_count_topview/output_image.png" alt="Sample application output"
-     margin-right=10px; 
-     width=600px;
-     height=334px />
-
-## 6. Compile the Application (Optional)
-
-If you want to modify the code and recompile the application, follow the steps below:
+## 4. Compile the Application
 
 ### Step 1: Refer to the SDK Getting Started Guide
 Visit the Renesas RZ/V AI SDK Getting Started Guide for the setup.
@@ -129,3 +100,54 @@ The generated file will be named:
 ```sh
     head_count_topview_app
 ```
+## 5. Copy the Object File (optional)
+###  Running the Program Using the Precompiled Object File
+If you prefer to skip the compilation process described in Step 4, you can directly use the precompiled object file included in this repository. This step is useful if you want to quickly run the program without setting up the build environment.
+
+```sh
+cp -r ../../Kakip_RZV2H_Demos/Head_count_topview/head_count_topview_app exe_v2h
+```
+
+## 5. Application: Deploy Stage
+For the ease of deployment all the deployables file and folders are provided on the exe_v2h folder.
+
+|File | Details |
+|:---|:---|
+|topview_head_count_yolov3 | Model object files for deployment.|
+|head_count_topview_app | application file. |
+
+1. Follow the steps below to deploy the project on the board. 
+    1. Run the commands below to download the `11_Head_count_topview_deploy_tvm-v230.so` from [Release v5.00](https://github.com/Ignitarium-Renesas/rzv_ai_apps/releases/tag/v5.00)
+    ```
+    cd ${PROJECT_PATH}/11_Head_count_topview/exe_v2h/topview_head_count_yolov3
+    wget https://github.com/Ignitarium-Renesas/rzv_ai_apps/releases/download/v5.00/11_Head_count_topview_deploy_tvm-v230.so
+    ```
+    2. Rename the `11_Head_count_topview_deploy_tvm-v230.so` to `deploy.so`.
+    ```
+    mv 11_Head_count_topview_deploy_tvm-v230.so deploy.so
+    ```
+    3. Copy the following files to the `/home/root/tvm` directory of the rootfs (SD Card) for the board.
+        -  All files in [exe_v2h](./exe_v2h) directory. (Including `deploy.so` file.)
+        -  `11_Head_count_topview` application file if you generated the file according to [Application File Generation](#application-file-generation)
+
+## 6. Run the Application
+To run the application on the Kakip board:
+
+On the board terminal, execute the application with the following command, specifying either USB camera or IMAGE input mode:
+
+- **Image Input**:
+    ```sh
+    ./head_count_topview_app IMAGE ../img/sample.jpeg
+    ```
+
+- **USB Camera Input**:
+    ```sh
+    ./head_count_topview_app USB
+    ```
+
+Following window shows up on HDMI screen.
+<img src="./Head_count_topview/output_image.png" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
+
