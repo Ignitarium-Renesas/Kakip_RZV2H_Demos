@@ -17,7 +17,14 @@ Refer to the image below for a visual guide to setting up the Kakip board for de
      width=600px;
      height=334px />
 
-# Head Count Top View Application
+#  Head Count Top View Application
+
+<img src="./Head_count_topview/output_image.png" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
+
+This application is used to count the human heads present in a video from Image/camera input.
 
 This repository contains the `11_Head_count_topview` application. Below are the detailed steps for setting up, applying patches, running the application, and building it.
 
@@ -103,7 +110,7 @@ For the ease of deployment all the deployables file and folders are provided on 
         -  All files in [exe_v2h](./exe_v2h) directory. (Including `deploy.so` file.)
         -  `11_Head_count_topview` application file if you generated the file according to [Application File Generation](#application-file-generation)
 
-## 6. Run the Application
+## Run the Application
 To run the application on the Kakip board:
 
 On the board terminal, execute the application with the following command, specifying either USB camera or IMAGE input mode:
@@ -117,42 +124,25 @@ On the board terminal, execute the application with the following command, speci
     ```sh
     ./head_count_topview_app USB
     ```
+# Animal detection Application
 
-Following window shows up on HDMI screen.
-<img src="./Head_count_topview/output_image.png" alt="Sample application output"
+<img src="./Animal_detection/output_image.png" alt="Sample application output"
      margin-right=10px; 
      width=600px;
      height=334px />
 
+This application detects animals using a YOLOv3 model and classifies them based on input from a USB camera or an image file.
 
 
-# Animal detection Application
+## Steps Overview
 
-This repository contains the `07_Animal_detection` application. Below are the detailed steps for setting up, applying patches, running the application, and building it.
-
-### Step 1: Refer to the SDK Getting Started Guide
-Visit the Renesas RZ/V AI SDK [Getting Started](https://renesas-rz.github.io/rzv_ai_sdk/getting_started) Guide for the setup.
-### Step 2: Clone the Repository
-It is recommended to download/clone the repository on the `data` folder which is mounted on the `rzv2h_ai_sdk_container` docker container as shown below. 
- ```sh
-    cd <path_to_data_folder_on_host>/data
-    git clone https://github.com/Ignitarium-Renesas/rzv_ai_apps.git
-    git clone https://github.com/Ignitarium-Renesas/Kakip_RZV2H_Demos.git
-```
-> Note 1: Please verify the git repository url if error occurs.
-
-> Note 2: This command will download whole repository, which include all other applications.<br>
-     If you have already downloaded the repository of the same version, you may not need to run this command.
-### Step 3: Start the Docker Container  
-Run (or start) the docker container and open the bash terminal on the container.  
-Here, we use the `rzv2h_ai_sdk_container` as the name of container, created from  `rzv2h_ai_sdk_image` docker image.  
-    > Note that all the build steps/commands listed below are executed on the docker container bash terminal.  
-
-### Step 4: Set Environment Variables
-Set your clone directory to the environment variable.  
+###  **Follow Steps 1–4 from the Head Count Top View Guide:**
+- Set up the environment, clone repositories, and configure the Docker container.
+- **Ensure** that the `PROJECT_PATH` is set:
 ```sh
-    export PROJECT_PATH=/drp-ai_tvm/data
+  export PROJECT_PATH=/drp-ai_tvm/data
 ```
+
 ### Step 5: Apply the Patch File
 Apply the provided patch file to the application using the command below:
 
@@ -165,14 +155,7 @@ Move to the source code directory of the application:
 ```sh
     cd ${PROJECT_PATH}/rzv_ai_apps/07_Animal_detection/src
 ```
-### Step 7: Build the Application
-Build the application by following the commands below.  
-
-```sh
-    mkdir -p build && cd build
-    cmake -DCMAKE_TOOLCHAIN_FILE=./toolchain/runtime.cmake -DV2H=ON ..
-    make -j$(nproc)
-```
+#### Follow Step 7 from the Head Count Top View Guide to build the application
 ### Step 8: Locate the Generated Application
 The built application file will be available in the following directory:
  ```sh
@@ -211,7 +194,7 @@ For the ease of deployment all the deployables file and folders are provided on 
         -  All files in [exe_v2h](./exe_v2h) directory. (Including `deploy.so` file.)
         -  `07_Animal_detection` application file if you generated the file according to [Application File Generation](#application-file-generation)
 
-## 6. Run the Application
+## Run the Application
 To run the application on the Kakip board:
 
 On the board terminal, execute the application with the following command, specifying either USB camera or IMAGE input mode:
@@ -226,9 +209,4 @@ On the board terminal, execute the application with the following command, speci
     ./animal_detection_app USB
     ```
 
-Following window shows up on HDMI screen.
-<img src="./Animal_detection/output_image.png" alt="Sample application output"
-     margin-right=10px; 
-     width=600px;
-     height=334px />
 
