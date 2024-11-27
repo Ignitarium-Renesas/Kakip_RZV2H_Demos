@@ -1,0 +1,180 @@
+diff --git a/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp b/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
+index da402a2..c917d81 100644
+--- a/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
++++ b/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
+@@ -40,7 +40,6 @@
+ #include <linux/input.h>
+ #include <builtin_fp16.h>
+ #include <opencv2/opencv.hpp>
+-#include "wayland.h"
+ 
+ /*Pre-processing Runtime Header*/
+ #include "PreRuntime.h"
+@@ -66,7 +65,6 @@ static float drpai_output_buf[INF_OUT_SIZE];
+ static float drpai_output_buf1[INF_OUT_SIZE];
+ static float drpai_output_buf2[INF_OUT_SIZE];
+ static float drpai_output_buf3[INF_OUT_SIZE];
+-static Wayland wayland;
+ static pthread_t ai_inf_thread;
+ static pthread_t kbhit_thread;
+ static pthread_t capture_thread;
+@@ -90,6 +88,7 @@ static int32_t number_of_cameras;
+ std::vector<std::string> gstreamer_pipeline;
+ std::vector<std::string> device_paths;
+ std::vector<VideoCapture> cap;
++int32_t VEHICLE_COUNT= 0;
+ 
+ uint64_t drpaimem_addr_start = 0;
+ bool runtime_status = false; 
+@@ -360,6 +359,7 @@ void draw_bounding_box(void)
+     string result_str;
+     int32_t i = 0;
+     uint32_t color=0;
++    int32_t result_cnt = 0;
+ 
+     vector<detection> tmp_buff;
+ 
+@@ -389,6 +389,8 @@ void draw_bounding_box(void)
+             /* Skip the overlapped bounding boxes */
+             if (tmp_buff[i].prob == 0) continue;
+ 
++            result_cnt++;
++
+             color = box_color[tmp_buff[i].c];
+             /* Clear string stream for bounding box labels */
+             stream.str("");
+@@ -411,6 +413,9 @@ void draw_bounding_box(void)
+             uint8_t g = (color >>  8) & 0x0000FF;
+             uint8_t b = color & 0x0000FF;
+ 
++            std::cout<<"topleft :"<<cv::Point(x_min,y_min)<<endl;
++            std::cout<<"bottomRight :"<<cv::Point(x_max,y_max)<<endl;
++
+             cv::rectangle(tmp_image, cv::Point(x_min,y_min), cv::Point(x_max,y_max), cv::Scalar(b, g, r, 0xFF), BOX_LINE_SIZE);
+ 
+             cv::Size size = cv::getTextSize(result_str.c_str(), cv::FONT_ITALIC, BOX_CHAR_THICKNESS, thickness + 2, &baseline);
+@@ -419,6 +424,7 @@ void draw_bounding_box(void)
+             cv::putText(tmp_image, result_str.c_str(), cv::Point(x_min, y_min+BOX_TEXT_HEIGHT_OFFSET), cv::FONT_ITALIC, BOX_CHAR_THICKNESS, cv::Scalar(0x00, 0x00, 0x00, 0xFF), thickness);
+         }
+     }
++    VEHICLE_COUNT = result_cnt++;
+     return;
+ }
+ 
+@@ -978,6 +984,24 @@ key_hit_end:
+     pthread_exit(NULL);
+ }
+ 
++Mat combineFrames(const vector<Mat> &frames, int Width, int Height) {
++    vector<Mat> resized_frames;
++    for (const auto &frame : frames) {
++        if (!frame.empty()) {
++            Mat resized;
++            resize(frame, resized, Size(Width, Height));
++            resized_frames.push_back(resized);
++        }
++    }
++
++    Mat combined_image;
++    if (!resized_frames.empty()) {
++        hconcat(resized_frames, combined_image); // Combine resized frames
++    }
++
++    return combined_image;
++}
++
+ /*****************************************
+ * Function Name : R_Capture_Thread
+ * Description   : Executes the V4L2 capture with Capture thread.
+@@ -1251,12 +1275,11 @@ int8_t R_Main_Process()
+     stringstream stream;
+     string str = "";
+     int32_t baseline = 10;
+-    uint8_t * img_buffer0;
++    int frame_count = 1;  
++    std::string output_dir = "../outputs";
+ 
+     string sensor_str = "";
+ 
+-    img_buffer0 = (unsigned char*) (malloc(DISP_OUTPUT_WIDTH*DISP_OUTPUT_HEIGHT*BGRA_CHANNEL));
+-
+     printf("Main Loop Starts\n");
+     /*Main Loop Start*/
+     while(1)
+@@ -1402,12 +1425,19 @@ int8_t R_Main_Process()
+                     CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+         putText(output_image, str,Point((DISP_INF_WIDTH - temp_size.width - RIGHT_ALIGN_OFFSET), (960 + temp_size.height)), FONT_HERSHEY_SIMPLEX,
+                     CHAR_SCALE_LARGE, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-        cv::Mat bgra_image;
+-        cv::cvtColor(output_image, bgra_image, cv::COLOR_BGR2BGRA);
+-
+-        memcpy(img_buffer0, bgra_image.data, DISP_OUTPUT_WIDTH * DISP_OUTPUT_HEIGHT * BGRA_CHANNEL);
+-        wayland.commit(img_buffer0, NULL);
+ 
++        if (VEHICLE_COUNT >= 1)
++        {
++            
++            std::string filename = output_dir + "/output" + std::to_string(frame_count++) + ".jpg";
++            Mat combined_image = combineFrames(img_frames, IMAGE_WIDTH, IMAGE_HEIGHT); 
++            if (!combined_image.empty()) {
++                imwrite(filename, combined_image); 
++            }
++            std::cout << "[INFO] Saved frame with VEHICLE_COUNT >= 1 as " << filename << std::endl;
++        
++        }
++       
+         img_processing_start.store(0);
+     }/*End of Loop*/
+     goto main_proc_end;
+@@ -1419,7 +1449,6 @@ err:
+ /*Main Processing Termination*/
+ main_proc_end:
+     printf("Main Process Terminated\n");
+-    free(img_buffer0);
+     return main_ret;
+ }
+ 
+@@ -1741,15 +1770,7 @@ int main(int argc, char *argv[])
+                 {
+                 gstreamer_pipeline.push_back("v4l2src device=" + device_paths[i] + " ! video/x-raw, width=640, height=480, framerate=10/1 ! videoconvert ! appsink -v");
+                 }
+-                /* Initialize waylad */
+-                ret = wayland.init(DISP_OUTPUT_WIDTH, DISP_OUTPUT_HEIGHT, BGRA_CHANNEL);
+-                if(0 != ret)
+-                {
+-                    fprintf(stderr, "[ERROR] Failed to initialize Image for Wayland\n");
+-                    ret_main = -1;
+-                    goto end_close_drpai;
+-                }
+-
++                
+                 /*Termination Request Semaphore Initialization*/
+                 /*Initialized value at 1.*/
+                 sem_create = sem_init(&terminate_req_sem, 0, 1);
+@@ -1862,15 +1883,7 @@ int main(int argc, char *argv[])
+                     std::system(command.c_str());
+                     }                    
+                 }
+-                /* Initialize waylad */
+-                ret = wayland.init(DISP_OUTPUT_WIDTH, DISP_OUTPUT_HEIGHT, BGRA_CHANNEL);
+-                if(0 != ret)
+-                {
+-                    fprintf(stderr, "[ERROR] Failed to initialize Image for Wayland\n");
+-                    ret_main = -1;
+-                    goto end_close_drpai;
+-                }
+-
++               
+                 /*Termination Request Semaphore Initialization*/
+                 /*Initialized value at 1.*/
+                 sem_create = sem_init(&terminate_req_sem, 0, 1);
+@@ -1978,9 +1991,6 @@ end_threads:
+         sem_destroy(&terminate_req_sem);
+     }
+ 
+-    /* Exit the program */
+-    wayland.exit();
+-
+     goto end_free_malloc;
+ end_free_malloc:
+     free(drpai_buf);
