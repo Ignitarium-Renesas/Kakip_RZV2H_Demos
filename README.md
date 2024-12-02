@@ -277,4 +277,98 @@ On the board terminal, execute the application with the following command, speci
     ./multi_camera_vehicle_detection_app USB 2
     ```
 
+# Hand gesture recognition Application
+
+This application is not covered with MIT license. This application is licensed with Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) license.
+Please have a look at dos and dont's here : [Creative commons website link](https://creativecommons.org/licenses/by-sa/4.0/deed.en)
+Hand gesture model's reference : [Dataset link](https://github.com/hukenovs/hagrid)
+
+User can :
+Share — copy and redistribute the material in any medium or format
+Adapt — remix, transform, and build upon the material for any purpose, even commercially.
+
+Under these terms:
+Attribution — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+ShareAlike — If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original.
+No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+
+This application showcases the capability of deep neural networks to predict different hand gestures. It detect total of 8 Gestures that includes one, two, three, four, five, thumbs up, thumbs down and rock in the hand with the highest precision.
+
+
+## Steps Overview
+
+###  **Follow Steps 1–4 from the Head Count Top View Guide:**
+- Set up the environment, clone repositories, and configure the Docker container.
+- **Ensure** that the `PROJECT_PATH` is set:
+```sh
+  export PROJECT_PATH=/drp-ai_tvm/data
+```
+
+### Step 5: Apply the Patch File
+Apply the provided patch file to the application using the command below:
+
+```sh
+cd ${PROJECT_PATH}/rzv_ai_apps/12_Hand_gesture_recognition_v2/
+git apply ../../Kakip_RZV2H_Demos/Hand_gesture/hand_gesture.patch
+```
+### Step 6: Navigate to the Application Directory
+Move to the source code directory of the application:  
+```sh
+    cd ${PROJECT_PATH}/rzv_ai_apps/12_Hand_gesture_recognition_v2/src
+```
+#### Follow Step 7 from the Head Count Top View Guide to build the application
+### Step 8: Locate the Generated Application
+The built application file will be available in the following directory:
+ ```sh
+    ${PROJECT_PATH}/12_Hand_gesture_recognition_v2/src/build
+```
+The generated file will be named:   
+```sh
+    hand_gesture_recognition_v2_app
+```
+## Copy the Object File (optional)
+###  Running the Program Using the Precompiled Object File
+If you prefer to skip the compilation process, you can directly use the precompiled object file included in this repository. This step is useful if you want to quickly run the program without setting up the build environment.
+
+```sh
+cp -r ../../Kakip_RZV2H_Demos/Hand_gesture/hand_gesture_recognition_v2_app exe_v2h
+```
+## Application: Deploy Stage
+For the ease of deployment all the deployables file and folders are provided on the [exe_v2h](./exe_v2h) folder.
+
+|File | Details |
+|:---|:---|
+|hand_yolov3_onnx| Model object files for deployment.|
+|hand_gesture_recognition_v2_app | application file. |
+
+1. Follow the steps below to deploy the project on the board. 
+    1. Run the commands below to download the `12_Hand_gesture_recognition_v2_deploy_tvm-v230.so` from [Release v5.00](https://github.com/Ignitarium-Renesas/rzv_ai_apps/releases/tag/v5.00)
+    ```
+    cd ${PROJECT_PATH}/12_Hand_gesture_recognition_v2/exe_v2h/hand_yolov3_onnx
+    wget https://github.com/Ignitarium-Renesas/rzv_ai_apps/releases/download/v5.00/12_Hand_gesture_recognition_v2_deploy_tvm-v230.so
+    ```
+    2. Rename the `12_Hand_gesture_recognition_v2_deploy_tvm-v230.so` to `deploy.so`.
+    ```
+    mv 12_Hand_gesture_recognition_v2_deploy_tvm-v230.so deploy.so
+    ```
+
+    3. Verify the presence of `deploy.so` file in ${PROJECT_PATH}/12_Hand_gesture_recognition_v2/exe_v2h/hand_yolov3_onnx 
+    4. Copy the following files to the `/home/root/tvm` directory of the rootfs (SD Card) for the board.
+        -  All files in [exe_v2h](./exe_v2h) directory. (Including `deploy.so` file.)
+        -  `12_Hand_gesture_recognition_v2` application file if you generated the file by following all the steps.
+
+## Run the Application
+To run the application on the Kakip board:
+
+On the board terminal, execute the application with the following command, specifying either USB camera or IMAGE input mode:
+
+- **Image Input**:
+    ```sh
+    ./hand_gesture_recognition_v2_app IMAGE <path_to_the_image> 
+    ```
+
+- **USB Camera Input**:
+    ```sh
+    ./hand_gesture_recognition_v2_app USB
+    ```
 

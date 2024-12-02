@@ -1,0 +1,238 @@
+diff --git a/12_Hand_gesture_recognition_v2/src/define.h b/12_Hand_gesture_recognition_v2/src/define.h
+index b9f247a..c9554cc 100755
+--- a/12_Hand_gesture_recognition_v2/src/define.h
++++ b/12_Hand_gesture_recognition_v2/src/define.h
+@@ -148,7 +148,7 @@ const static double anchors[] =
+ #define HC_CHAR_THICKNESS           (4)
+ #define FPS_CHAR_THICKNESS          (4)
+ #define RIGHT_ALIGN_OFFSET          (20)
+-#define HAND_STR_X                  (20)
++#define HAND_STR_X                  (30)
+ #define HAND_STR_Y                  (30)
+ #define GESTURE_CHAR_THICKNESS      (1.9)
+ #define GESTURE_SCALE_SMALL         (0.6)
+diff --git a/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp b/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
+index 9fa420a..7ad6130 100644
+--- a/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
++++ b/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
+@@ -39,7 +39,6 @@
+ #include <linux/input.h>
+ #include <builtin_fp16.h>
+ #include <opencv2/opencv.hpp>
+-#include "wayland.h"
+ 
+ 
+ using namespace std;
+@@ -50,7 +49,6 @@ MeraDrpRuntimeWrapper runtime;
+ 
+ /*Global Variables*/
+ static float drpai_output_buf[INF_OUT_SIZE];
+-static Wayland wayland;
+ static pthread_t ai_inf_thread;
+ static pthread_t kbhit_thread;
+ static sem_t terminate_req_sem;
+@@ -86,8 +84,9 @@ VideoCapture cap;
+ cv::Mat output_image;
+ 
+ /* Map to store input source list */
+-std::map<std::string, int> input_source_map ={    
+-    {"USB", 1}
++std::map<std::string, int> input_source_map ={
++    {"IMAGE", 1},    
++    {"USB", 2}
+      } ;
+ 
+ 
+@@ -418,6 +417,8 @@ void draw_bounding_box(void)
+     Point topLeft(x_min, y_min);
+     Point bottomRight(x_max, y_max);
+ 
++    std::cout<<"topleft :"<<topLeft<<endl;
++    std::cout<<"bottomRight :"<<bottomRight<<endl;
+     Point topLeft2(x2_min, y2_min);
+     Point bottomRight2(x2_max, y2_max);
+     rectangle(g_frame, topLeft, bottomRight, Scalar(0, 255, 0), BOX_THICKNESS);
+@@ -578,9 +579,6 @@ void capture_frame(std::string gstreamer_pipeline )
+     string str = "";
+     int32_t ret = 0;
+     int32_t baseline = 10;
+-    uint8_t * img_buffer0;
+-
+-    img_buffer0 = (unsigned char*) (malloc(DISP_OUTPUT_WIDTH*DISP_OUTPUT_HEIGHT*BGRA_CHANNEL));
+     /* Capture stream of frames from camera using Gstreamer pipeline */
+     cap.open(gstreamer_pipeline, CAP_GSTREAMER);
+     if (!cap.isOpened())
+@@ -621,15 +619,6 @@ void capture_frame(std::string gstreamer_pipeline )
+             /* Draw bounding box on the frame */
+             draw_bounding_box();
+             /*Display frame */
+-            stream.str("");
+-            stream << "Camera Frame Rate : "<<fps <<" fps ";
+-            str = stream.str();
+-            Size camera_rate_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - camera_rate_size.width - RIGHT_ALIGN_OFFSET), (FPS_STR_Y + camera_rate_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - camera_rate_size.width - RIGHT_ALIGN_OFFSET), (FPS_STR_Y + camera_rate_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-
+             if (HAND_COUNT == 1)
+             {            
+                 stream.str("");
+@@ -650,68 +639,36 @@ void capture_frame(std::string gstreamer_pipeline )
+                 putText(g_frame, str,Point(HAND_STR_X, HAND_STR_Y), FONT_HERSHEY_SIMPLEX, 
+                             GESTURE_SCALE_SMALL, Scalar(0, 255, 255), GESTURE_CHAR_THICKNESS);
+             }            
+-            stream.str("");
+-            stream << "Total Time: " << fixed << setprecision(1) << TOTAL_TIME<<" ms";
+-            str = stream.str();
+-            Size tot_time_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_LARGE, HC_CHAR_THICKNESS, &baseline);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - tot_time_size.width - RIGHT_ALIGN_OFFSET), (T_TIME_STR_Y + tot_time_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - tot_time_size.width - RIGHT_ALIGN_OFFSET), (T_TIME_STR_Y + tot_time_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_LARGE, Scalar(0, 255, 0), HC_CHAR_THICKNESS);
+-            stream.str("");
+-            stream << "Pre-Proc: " << fixed << setprecision(1)<< PRE_PROC_TIME<<" ms";
+-            str = stream.str();
+-            Size pre_proc_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - pre_proc_size.width - RIGHT_ALIGN_OFFSET), (PRE_TIME_STR_Y + pre_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - pre_proc_size.width - RIGHT_ALIGN_OFFSET), (PRE_TIME_STR_Y + pre_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-            stream.str("");
+-            stream << "Inference: "<< fixed << setprecision(1) << INF_TIME<<" ms";
+-            str = stream.str();
+-            Size inf_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - inf_size.width - RIGHT_ALIGN_OFFSET), (I_TIME_STR_Y + inf_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - inf_size.width - RIGHT_ALIGN_OFFSET), (I_TIME_STR_Y + inf_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-            stream.str("");
+-            stream << "Post-Proc: "<< fixed << setprecision(1) << POST_PROC_TIME<<" ms";
+-            str = stream.str();
+-            Size post_proc_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
++            
+             
+             Size size(DISP_INF_WIDTH, DISP_INF_HEIGHT);
+             /*resize the image to the keep ratio size*/
+-            resize(g_frame, g_frame, size);            
+-            g_frame.copyTo(output_image(Rect(0, 60, DISP_INF_WIDTH, DISP_INF_HEIGHT)));
+-            namedWindow("Output Image", WND_PROP_FULLSCREEN);
+-            setWindowProperty("Output Image", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
++            resize(g_frame, g_frame, size);  
++            /* Display the frame in a window */
++            cv::imshow("Output Image", g_frame);
++
++            char key = (char) cv::waitKey(1);
++            if (key == 'q' || key == 27) 
++            {
++                break;
++            }          
++
+             string click_req = "Output Image";
+             setMouseCallback(click_req,click_event,NULL);
+-            cv::Mat bgra_image;
+-            cv::cvtColor(output_image, bgra_image, cv::COLOR_BGR2BGRA);            
+             
+-            memcpy(img_buffer0, bgra_image.data, DISP_OUTPUT_WIDTH * DISP_OUTPUT_HEIGHT * BGRA_CHANNEL);
+-            wayland.commit(img_buffer0, NULL);            
+         }
+     }
+-    free(img_buffer0);
+     
+     cap.release(); 
+     destroyAllWindows();
+     err:
+     /*Set Termination Request Semaphore to 0*/
+-    free(img_buffer0);
+     sem_trywait(&terminate_req_sem);
+     goto ai_inf_end;
+     /*AI Thread Termination*/
+     ai_inf_end:
+         /*To terminate the loop in Capture Thread.*/
+         printf("AI Inference Thread Terminated\n");
+-        free(img_buffer0);
+         pthread_exit(NULL);
+         return;
+ }
+@@ -875,13 +832,6 @@ std::string query_device_status(std::string device_type)
+ 
+ void *R_Inf_Thread(void *threadid)
+ {
+-    int8_t ret = 0;
+-    ret = wayland.init(DISP_OUTPUT_WIDTH, DISP_OUTPUT_HEIGHT, BGRA_CHANNEL);
+-    if(0 != ret)
+-    {
+-        fprintf(stderr, "[ERROR] Failed to initialize Image for Wayland\n");
+-        goto err;
+-    }
+     capture_frame(gstreamer_pipeline);
+ 
+ /*Error Processing*/
+@@ -956,11 +906,11 @@ int main(int argc, char *argv[])
+     }
+     OCA_Activate( &OCA_list[0] );
+ 
+-    if (strcmp(argv[1],"USB")==0)
++    if (strcmp(argv[1],"USB")==0 || strcmp(argv[1],"IMAGE")==0)
+     {   
+-        if (argc >= 3 )
++        if (argc >= 4 )
+         {
+-            drpai_freq = atoi(argv[2]);
++            drpai_freq = atoi(argv[3]);
+             if ((1 <= drpai_freq) && (127 >= drpai_freq))
+             {
+                 printf("Argument : <AI-MAC_freq_factor> = %d\n", drpai_freq);
+@@ -1021,8 +971,34 @@ int main(int argc, char *argv[])
+     std::cout << "[INFO] loaded runtime model :" << model_dir << "\n\n";
+     switch (input_source_map[input_source])
+     {
++        /* Input Source : IMAGE*/
++        case 1:
++        {
++            std::cout << "Image_path: " << argv[2] << std::endl;
++            // read frame
++            g_frame = imread(argv[2]);
++
++            /* If empty frame */
++            if (g_frame.empty())
++            {
++                std::cout << "Failed to load image!" << std::endl;
++                return -1;
++            }
++            resize(g_frame, g_frame, Size(IMAGE_WIDTH, IMAGE_HEIGHT));
++            int ret = Hand_Gesture_Recognition();
++
++            if (ret != 0)
++            {
++                fprintf(stderr, "[Error] Inference Not working !!! ");
++                return -1;
++            }
++            draw_bounding_box();
++            imwrite("Output_Image.png", g_frame);
++        }
++        break;
++
+         /* Input Source : USB*/
+-        case 1:{
++        case 2:{
+             std::cout << "[INFO] USB CAMERA \n";
+             media_port = query_device_status("usb");
+             gstreamer_pipeline = "v4l2src device=" + media_port + " ! video/x-raw, width=640, height=480 ! videoconvert ! appsink";
+@@ -1087,9 +1063,7 @@ end_threads:
+     {
+         sem_destroy(&terminate_req_sem);
+     }
+-    /* Exit the program */
+-    wayland.exit();
+     close(drpai_fd);
+     return 0;
+   
+-  }
+\ No newline at end of file
++}
+\ No newline at end of file
