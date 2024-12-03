@@ -1,8 +1,27 @@
 diff --git a/12_Hand_gesture_recognition_v2/src/define.h b/12_Hand_gesture_recognition_v2/src/define.h
-index b9f247a..c9554cc 100755
+index b9f247a..51c8f61 100755
 --- a/12_Hand_gesture_recognition_v2/src/define.h
 +++ b/12_Hand_gesture_recognition_v2/src/define.h
-@@ -148,7 +148,7 @@ const static double anchors[] =
+@@ -130,16 +130,8 @@ const static double anchors[] =
+ #define CLASS_LABEL_WIDTH           (90)
+ #define HAND_COUNT_STR_X            (645)
+ #define HAND_COUNT_STR_Y            (30)
+-#define FPS_STR_X                   (645)
+-#define FPS_STR_Y                   (360)
+-#define PRE_TIME_STR_X              (645)
+-#define PRE_TIME_STR_Y              (170)
+-#define P_TIME_STR_X                (645)
+-#define P_TIME_STR_Y                (270)
+-#define I_TIME_STR_X                (645)
+-#define I_TIME_STR_Y                (220)
+-#define T_TIME_STR_X                (645)
+-#define T_TIME_STR_Y                (120)
++#define FPS_STR_X                   (50)
++#define FPS_STR_Y                   (50)
+ #define CHAR_SCALE_LARGE            (1.6)
+ #define CHAR_SCALE_SMALL            (1.2)
+ #define CHAR_SCALE_XS               (0.5)
+@@ -148,7 +140,7 @@ const static double anchors[] =
  #define HC_CHAR_THICKNESS           (4)
  #define FPS_CHAR_THICKNESS          (4)
  #define RIGHT_ALIGN_OFFSET          (20)
@@ -12,7 +31,7 @@ index b9f247a..c9554cc 100755
  #define GESTURE_CHAR_THICKNESS      (1.9)
  #define GESTURE_SCALE_SMALL         (0.6)
 diff --git a/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp b/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
-index 9fa420a..7ad6130 100644
+index 9fa420a..1e875c2 100644
 --- a/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
 +++ b/12_Hand_gesture_recognition_v2/src/hand_gesture_recognition.cpp
 @@ -39,7 +39,6 @@
@@ -31,7 +50,21 @@ index 9fa420a..7ad6130 100644
  static pthread_t ai_inf_thread;
  static pthread_t kbhit_thread;
  static sem_t terminate_req_sem;
-@@ -86,8 +84,9 @@ VideoCapture cap;
+@@ -69,11 +67,12 @@ uint64_t drpaimem_addr_start = 0;
+ bool runtime_status = false; 
+ static vector<detection> det;
+ 
+-float fps = 0;
+ float TOTAL_TIME = 0;
+ float INF_TIME= 0;
+ float POST_PROC_TIME = 0;
+ float PRE_PROC_TIME = 0;
++int frame_count = 0;  
++float accumulated_time = 0.0f;
+ int32_t HAND_COUNT= 0;
+ std::string GESTURE;
+ int fd;
+@@ -86,8 +85,9 @@ VideoCapture cap;
  cv::Mat output_image;
  
  /* Map to store input source list */
@@ -43,7 +76,7 @@ index 9fa420a..7ad6130 100644
       } ;
  
  
-@@ -418,6 +417,8 @@ void draw_bounding_box(void)
+@@ -418,6 +418,8 @@ void draw_bounding_box(void)
      Point topLeft(x_min, y_min);
      Point bottomRight(x_max, y_max);
  
@@ -52,17 +85,40 @@ index 9fa420a..7ad6130 100644
      Point topLeft2(x2_min, y2_min);
      Point bottomRight2(x2_max, y2_max);
      rectangle(g_frame, topLeft, bottomRight, Scalar(0, 255, 0), BOX_THICKNESS);
-@@ -578,9 +579,6 @@ void capture_frame(std::string gstreamer_pipeline )
+@@ -578,9 +580,7 @@ void capture_frame(std::string gstreamer_pipeline )
      string str = "";
      int32_t ret = 0;
      int32_t baseline = 10;
 -    uint8_t * img_buffer0;
 -
 -    img_buffer0 = (unsigned char*) (malloc(DISP_OUTPUT_WIDTH*DISP_OUTPUT_HEIGHT*BGRA_CHANNEL));
++    float fps = 0.0f;
      /* Capture stream of frames from camera using Gstreamer pipeline */
      cap.open(gstreamer_pipeline, CAP_GSTREAMER);
      if (!cap.isOpened())
-@@ -621,15 +619,6 @@ void capture_frame(std::string gstreamer_pipeline )
+@@ -591,8 +591,6 @@ void capture_frame(std::string gstreamer_pipeline )
+     while (true)
+     {
+         cap >> g_frame;
+-        cv::Mat output_image(DISP_OUTPUT_HEIGHT,DISP_OUTPUT_WIDTH , CV_8UC3, cv::Scalar(0, 0, 0));
+-        fps = cap.get(CAP_PROP_FPS);
+         ret = sem_getvalue(&terminate_req_sem, &inf_sem_check);
+         if (0 != ret)
+         {
+@@ -617,19 +615,19 @@ void capture_frame(std::string gstreamer_pipeline )
+             {
+                 std::cerr << "[ERROR] Inference Not working !!! " << std::endl;
+             }
++            accumulated_time += TOTAL_TIME;
++            frame_count++;
++            if (frame_count == 30) {
++            float avg_time_per_frame = accumulated_time / 30.0f;  
++            fps = 1000.0f / avg_time_per_frame;  
++            // Reset counters
++            frame_count = 0;
++            accumulated_time = 0.0f;
++            }
+ 
              /* Draw bounding box on the frame */
              draw_bounding_box();
              /*Display frame */
@@ -78,10 +134,11 @@ index 9fa420a..7ad6130 100644
              if (HAND_COUNT == 1)
              {            
                  stream.str("");
-@@ -650,68 +639,36 @@ void capture_frame(std::string gstreamer_pipeline )
+@@ -649,69 +647,39 @@ void capture_frame(std::string gstreamer_pipeline )
+                             GESTURE_SCALE_SMALL, Scalar(0, 0, 0), 1.5*GESTURE_CHAR_THICKNESS);
                  putText(g_frame, str,Point(HAND_STR_X, HAND_STR_Y), FONT_HERSHEY_SIMPLEX, 
                              GESTURE_SCALE_SMALL, Scalar(0, 255, 255), GESTURE_CHAR_THICKNESS);
-             }            
+-            }            
 -            stream.str("");
 -            stream << "Total Time: " << fixed << setprecision(1) << TOTAL_TIME<<" ms";
 -            str = stream.str();
@@ -106,16 +163,18 @@ index 9fa420a..7ad6130 100644
 -                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
 -            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - inf_size.width - RIGHT_ALIGN_OFFSET), (I_TIME_STR_Y + inf_size.height)), FONT_HERSHEY_SIMPLEX, 
 -                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
--            stream.str("");
++            }    
+             stream.str("");
 -            stream << "Post-Proc: "<< fixed << setprecision(1) << POST_PROC_TIME<<" ms";
--            str = stream.str();
++            stream << "FPS: " << fixed << setprecision(2)<< fps;
+             str = stream.str();
 -            Size post_proc_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
 -            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
 -                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
 -            putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
 -                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
-+            
-             
+-            
++            putText(g_frame, str,Point(FPS_STR_X, FPS_STR_Y), FONT_HERSHEY_SIMPLEX, GESTURE_SCALE_SMALL, Scalar(255, 255, 255), GESTURE_CHAR_THICKNESS);            
              Size size(DISP_INF_WIDTH, DISP_INF_HEIGHT);
              /*resize the image to the keep ratio size*/
 -            resize(g_frame, g_frame, size);            
@@ -158,7 +217,7 @@ index 9fa420a..7ad6130 100644
          pthread_exit(NULL);
          return;
  }
-@@ -875,13 +832,6 @@ std::string query_device_status(std::string device_type)
+@@ -875,13 +843,6 @@ std::string query_device_status(std::string device_type)
  
  void *R_Inf_Thread(void *threadid)
  {
@@ -172,7 +231,7 @@ index 9fa420a..7ad6130 100644
      capture_frame(gstreamer_pipeline);
  
  /*Error Processing*/
-@@ -956,11 +906,11 @@ int main(int argc, char *argv[])
+@@ -956,11 +917,11 @@ int main(int argc, char *argv[])
      }
      OCA_Activate( &OCA_list[0] );
  
@@ -187,7 +246,7 @@ index 9fa420a..7ad6130 100644
              if ((1 <= drpai_freq) && (127 >= drpai_freq))
              {
                  printf("Argument : <AI-MAC_freq_factor> = %d\n", drpai_freq);
-@@ -1021,8 +971,34 @@ int main(int argc, char *argv[])
+@@ -1021,8 +982,34 @@ int main(int argc, char *argv[])
      std::cout << "[INFO] loaded runtime model :" << model_dir << "\n\n";
      switch (input_source_map[input_source])
      {
@@ -223,7 +282,7 @@ index 9fa420a..7ad6130 100644
              std::cout << "[INFO] USB CAMERA \n";
              media_port = query_device_status("usb");
              gstreamer_pipeline = "v4l2src device=" + media_port + " ! video/x-raw, width=640, height=480 ! videoconvert ! appsink";
-@@ -1087,9 +1063,7 @@ end_threads:
+@@ -1087,9 +1074,7 @@ end_threads:
      {
          sem_destroy(&terminate_req_sem);
      }
