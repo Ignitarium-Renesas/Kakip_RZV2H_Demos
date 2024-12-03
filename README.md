@@ -117,7 +117,7 @@ On the board terminal, execute the application with the following command, speci
 
 - **Image Input**:
     ```sh
-    ./head_count_topview_app IMAGE ../img/sample.jpeg
+    ./head_count_topview_app IMAGE <path_to_the_image>
     ```
 
 - **USB Camera Input**:
@@ -201,7 +201,7 @@ On the board terminal, execute the application with the following command, speci
 
 - **Image Input**:
     ```sh
-    ./animal_detection_app IMAGE ../img/sample.jpeg
+    ./animal_detection_app IMAGE <path_to_the_image>
     ```
 
 - **USB Camera Input**:
@@ -278,6 +278,11 @@ On the board terminal, execute the application with the following command, speci
     ```
 
 # Hand gesture recognition Application
+
+<img src="./Hand_gesture/output_image.png" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
 
 This application is not covered with MIT license. This application is licensed with Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) license.
 Please have a look at dos and dont's here : [Creative commons website link](https://creativecommons.org/licenses/by-sa/4.0/deed.en)
