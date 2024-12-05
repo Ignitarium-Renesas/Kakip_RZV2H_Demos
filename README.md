@@ -211,6 +211,11 @@ On the board terminal, execute the application with the following command, speci
 
 # Multi camera vehicle detection Application
 
+<img src="./multi_camera_vehicle_detection/output_image.jpg" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
+
 This application is used to detect 10 types of vehicles below from camera input.  
 Also it can be used for these vehicles at 360 angle with multi cameras.
 - Car, policecar, ambulance, bicycle, bus, truck, bike, tractor , auto and fire engine
@@ -270,11 +275,15 @@ For the ease of deployment all the deployables file and folders are provided on 
 ## Run the Application
 To run the application on the Kakip board:
 
-On the board terminal, execute the application with the following command, specifying the number cameras in the 2nd argument:
+On the board terminal, execute the application with the following command, specifying the number cameras as the 2nd argument and use 'FLIP' as the third argument if you want to flip the output. 
 
-- **USB Camera Input**:
+- **Application with USB Camera Input**:
     ```sh
     ./multi_camera_vehicle_detection_app USB 2
+    ```
+- **Application with USB Camera Input with flip mode**:
+    ```sh
+    ./multi_camera_vehicle_detection_app USB 2 FLIP
     ```
 
 # Hand gesture recognition Application
