@@ -1,5 +1,26 @@
+diff --git a/14_Multi_camera_vehicle_detection/src/define.h b/14_Multi_camera_vehicle_detection/src/define.h
+index bf2b0c4..3f04388 100644
+--- a/14_Multi_camera_vehicle_detection/src/define.h
++++ b/14_Multi_camera_vehicle_detection/src/define.h
+@@ -118,6 +118,7 @@ const static double anchors[] =
+ 
+ #define DISP_RESIZE_WIDTH            (1550)
+ #define DISP_RESIZE_HEIGHT           (1080)
++#define NUMBER_OF_CAMERAS               (3)
+ 
+ /*Image:: Text information to be drawn on image*/
+ #define BOX_LINE_SIZE               (3)
+@@ -132,6 +133,8 @@ const static double anchors[] =
+ #define I_TIME_STR_X                (645)
+ #define I_TIME_STR_Y                (600)
+ #define T_TIME_STR_Y                (500)
++#define FPS_STR_X                   (50)
++#define FPS_STR_Y                   (50)
+ #define CHAR_SCALE_LARGE            (1.6)
+ #define CHAR_SCALE_SMALL            (1.2)
+ #define CHAR_SCALE_APP_NAME         (1.0)
 diff --git a/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp b/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
-index da402a2..c917d81 100644
+index da402a2..81f6fc6 100644
 --- a/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
 +++ b/14_Multi_camera_vehicle_detection/src/multi_camera_vehicle_detection.cpp
 @@ -40,7 +40,6 @@
@@ -18,7 +39,16 @@ index da402a2..c917d81 100644
  static pthread_t ai_inf_thread;
  static pthread_t kbhit_thread;
  static pthread_t capture_thread;
-@@ -90,6 +88,7 @@ static int32_t number_of_cameras;
+@@ -82,6 +80,8 @@ float sum_inf_time;
+ float sum_pre_poc_time;
+ float sum_post_proc_time;
+ float sum_total_time;
++int processed_frame_count = 0;  
++float accumulated_time = 0.0f;
+ 
+ static sem_t terminate_req_sem;
+ static int32_t drpai_freq;
+@@ -90,6 +90,7 @@ static int32_t number_of_cameras;
  std::vector<std::string> gstreamer_pipeline;
  std::vector<std::string> device_paths;
  std::vector<VideoCapture> cap;
@@ -26,7 +56,16 @@ index da402a2..c917d81 100644
  
  uint64_t drpaimem_addr_start = 0;
  bool runtime_status = false; 
-@@ -360,6 +359,7 @@ void draw_bounding_box(void)
+@@ -117,7 +118,7 @@ std::vector<Mat> img_frames=
+ };
+ 
+ /* Map to store input source list */
+-std::map<std::string, int> input_source_map ={    
++std::map<std::string, int> input_source_map ={   
+     {"USB", 1},
+     {"MIPI", 2}
+     } ;
+@@ -360,6 +361,7 @@ void draw_bounding_box(void)
      string result_str;
      int32_t i = 0;
      uint32_t color=0;
@@ -34,7 +73,7 @@ index da402a2..c917d81 100644
  
      vector<detection> tmp_buff;
  
-@@ -389,6 +389,8 @@ void draw_bounding_box(void)
+@@ -389,6 +391,8 @@ void draw_bounding_box(void)
              /* Skip the overlapped bounding boxes */
              if (tmp_buff[i].prob == 0) continue;
  
@@ -43,7 +82,7 @@ index da402a2..c917d81 100644
              color = box_color[tmp_buff[i].c];
              /* Clear string stream for bounding box labels */
              stream.str("");
-@@ -411,6 +413,9 @@ void draw_bounding_box(void)
+@@ -411,6 +415,9 @@ void draw_bounding_box(void)
              uint8_t g = (color >>  8) & 0x0000FF;
              uint8_t b = color & 0x0000FF;
  
@@ -53,7 +92,7 @@ index da402a2..c917d81 100644
              cv::rectangle(tmp_image, cv::Point(x_min,y_min), cv::Point(x_max,y_max), cv::Scalar(b, g, r, 0xFF), BOX_LINE_SIZE);
  
              cv::Size size = cv::getTextSize(result_str.c_str(), cv::FONT_ITALIC, BOX_CHAR_THICKNESS, thickness + 2, &baseline);
-@@ -419,6 +424,7 @@ void draw_bounding_box(void)
+@@ -419,6 +426,7 @@ void draw_bounding_box(void)
              cv::putText(tmp_image, result_str.c_str(), cv::Point(x_min, y_min+BOX_TEXT_HEIGHT_OFFSET), cv::FONT_ITALIC, BOX_CHAR_THICKNESS, cv::Scalar(0x00, 0x00, 0x00, 0xFF), thickness);
          }
      }
@@ -61,7 +100,117 @@ index da402a2..c917d81 100644
      return;
  }
  
-@@ -978,6 +984,24 @@ key_hit_end:
+@@ -485,6 +493,7 @@ int Vehicle_Detection()
+         /* camera0 */
+         if(inf_num==0)
+         {
++            auto frame_start_time = std::chrono::high_resolution_clock::now();
+             auto t0 = std::chrono::high_resolution_clock::now();
+             in_param.pre_in_shape_w = IMAGE_WIDTH;
+             in_param.pre_in_shape_h = IMAGE_HEIGHT;
+@@ -549,6 +558,7 @@ int Vehicle_Detection()
+                 }
+                 size_count += output_size;
+             }
++            
+             if (ret != 0)
+             {
+                 std::cerr << "[ERROR] DRP Inference Not working !!! " << std::endl;
+@@ -557,6 +567,14 @@ int Vehicle_Detection()
+ 
+             R_Post_Proc(drpai_output_buf,  0);
+             auto t5 = std::chrono::high_resolution_clock::now();
++
++            if (ret == 0) { 
++                processed_frame_count++;
++                
++                auto frame_end_time = std::chrono::high_resolution_clock::now();
++                float frame_time_ms = std::chrono::duration<float, std::milli>(frame_end_time - frame_start_time).count();
++                accumulated_time += frame_time_ms;
++            }
+             
+             auto r_post_proc_time = std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
+             float total_time = float(inf_duration/1000.0) + float(r_post_proc_time/1000.0) + float(pre_proc_time/1000.0); 
+@@ -564,10 +582,12 @@ int Vehicle_Detection()
+             sum_pre_poc_time+=pre_proc_time/1000.0;
+             sum_post_proc_time+=r_post_proc_time/1000.0;
+             sum_total_time+=total_time;
++            
+         }
+         /* camera1 */
+         else if(inf_num==1)
+         {
++            auto frame_start_time = std::chrono::high_resolution_clock::now();
+             auto t0 = std::chrono::high_resolution_clock::now();
+             
+ 	        in_param.pre_in_shape_w = IMAGE_WIDTH;
+@@ -640,6 +660,13 @@ int Vehicle_Detection()
+ 
+             R_Post_Proc(drpai_output_buf1, 1);
+             auto t5 = std::chrono::high_resolution_clock::now();
++            if (ret == 0) { 
++                processed_frame_count++;
++                
++                auto frame_end_time = std::chrono::high_resolution_clock::now();
++                float frame_time_ms = std::chrono::duration<float, std::milli>(frame_end_time - frame_start_time).count();
++                accumulated_time += frame_time_ms;
++            }
+             
+             auto r_post_proc_time = std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
+             float total_time = float(inf_duration/1000.0) + float(r_post_proc_time/1000.0) + float(pre_proc_time/1000.0); 
+@@ -651,6 +678,7 @@ int Vehicle_Detection()
+         /* camera2 */
+         else if(inf_num==2)
+         {
++            auto frame_start_time = std::chrono::high_resolution_clock::now();
+             auto t0 = std::chrono::high_resolution_clock::now();
+ 	        in_param.pre_in_shape_w = IMAGE_WIDTH;
+             in_param.pre_in_shape_h = IMAGE_HEIGHT;
+@@ -723,6 +751,13 @@ int Vehicle_Detection()
+ 
+             R_Post_Proc(drpai_output_buf2, 2);
+             auto t5 = std::chrono::high_resolution_clock::now();
++            if (ret == 0) { 
++                processed_frame_count++;
++                
++                auto frame_end_time = std::chrono::high_resolution_clock::now();
++                float frame_time_ms = std::chrono::duration<float, std::milli>(frame_end_time - frame_start_time).count();
++                accumulated_time += frame_time_ms;
++            }
+             
+             auto r_post_proc_time = std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
+             float total_time = float(inf_duration/1000.0) + float(r_post_proc_time/1000.0) + float(pre_proc_time/1000.0); 
+@@ -734,6 +769,7 @@ int Vehicle_Detection()
+         /* camera3 */
+         else if(inf_num==3)
+         {
++            auto frame_start_time = std::chrono::high_resolution_clock::now();
+             auto t0 = std::chrono::high_resolution_clock::now();
+             in_param.pre_in_shape_w = IMAGE_WIDTH;
+             in_param.pre_in_shape_h = IMAGE_HEIGHT;
+@@ -806,6 +842,13 @@ int Vehicle_Detection()
+ 
+             R_Post_Proc(drpai_output_buf3, 3);
+             auto t5 = std::chrono::high_resolution_clock::now();
++            if (ret == 0) { 
++                processed_frame_count++;
++                
++                auto frame_end_time = std::chrono::high_resolution_clock::now();
++                float frame_time_ms = std::chrono::duration<float, std::milli>(frame_end_time - frame_start_time).count();
++                accumulated_time += frame_time_ms;
++            }
+             
+             auto r_post_proc_time = std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
+             float total_time = float(inf_duration/1000.0) + float(r_post_proc_time/1000.0) + float(pre_proc_time/1000.0); 
+@@ -906,6 +949,7 @@ int query_device_status(std::string device_type)
+     return 1;
+ }
+ 
++
+ /*****************************************
+ * Function Name : R_Kbhit_Thread
+ * Description   : Executes the Keyboard hit thread (checks if enter key is hit)
+@@ -978,6 +1022,24 @@ key_hit_end:
      pthread_exit(NULL);
  }
  
@@ -86,47 +235,130 @@ index da402a2..c917d81 100644
  /*****************************************
  * Function Name : R_Capture_Thread
  * Description   : Executes the V4L2 capture with Capture thread.
-@@ -1251,12 +1275,11 @@ int8_t R_Main_Process()
+@@ -998,12 +1060,12 @@ void *R_Capture_Thread(void *threadid)
+ 
+     for(i=0;i<number_of_cameras;i++)
+     {
+-        cap[i].open(gstreamer_pipeline[i], CAP_GSTREAMER);
++    cap[i].open(gstreamer_pipeline[i], CAP_GSTREAMER);
+         if (!cap[i].isOpened())
+         {
+         std::cerr << "[ERROR] Error opening video stream  or camera " << device_paths[i] << std::endl;
+         return 0;
+-        } 
++    }
+     }
+ 
+     while(1)
+@@ -1251,11 +1313,11 @@ int8_t R_Main_Process()
      stringstream stream;
      string str = "";
      int32_t baseline = 10;
 -    uint8_t * img_buffer0;
-+    int frame_count = 1;  
-+    std::string output_dir = "../outputs";
++    float fps = 0.0f;
++   
  
-     string sensor_str = "";
+-    string sensor_str = "";
  
 -    img_buffer0 = (unsigned char*) (malloc(DISP_OUTPUT_WIDTH*DISP_OUTPUT_HEIGHT*BGRA_CHANNEL));
--
++    string sensor_str = "";
+ 
      printf("Main Loop Starts\n");
      /*Main Loop Start*/
-     while(1)
-@@ -1402,12 +1425,19 @@ int8_t R_Main_Process()
-                     CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
-         putText(output_image, str,Point((DISP_INF_WIDTH - temp_size.width - RIGHT_ALIGN_OFFSET), (960 + temp_size.height)), FONT_HERSHEY_SIMPLEX,
-                     CHAR_SCALE_LARGE, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+@@ -1284,9 +1346,17 @@ int8_t R_Main_Process()
+             }
+             usleep(WAIT_TIME);
+         }
++        if (processed_frame_count == 30) {
++        float avg_time_per_frame = accumulated_time / 30.0f;  
++        fps = 1000.0f / avg_time_per_frame;  
++        // Reset counters
++        processed_frame_count = 0;
++        accumulated_time = 0.0f;
++        }
+ 
+         cv::Mat output_image(1080, 1920 , CV_8UC3, cv::Scalar(0, 0, 0));
+ 
++       
+         /* Draw bounding box and Mosaic on the frame */
+         draw_bounding_box();
+ 
+@@ -1349,65 +1419,17 @@ int8_t R_Main_Process()
+                 img_frames[0].copyTo(output_image(Rect(DISP_INF_WIDTH-IMAGE_WIDTH-IMAGE_WIDTH-IMAGE_WIDTH, 0, IMAGE_WIDTH, IMAGE_HEIGHT)));
+             }
+         }
++        Mat combined_image = combineFrames(img_frames, IMAGE_WIDTH, IMAGE_HEIGHT); 
+         stream.str("");
+-        stream << "14_Multi_camera_vehicle_detection";
+-        str = stream.str();
+-        Size app_name_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_APP_NAME, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((APP_NAME_X), (T_TIME_STR_Y + app_name_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_APP_NAME, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((APP_NAME_X), (T_TIME_STR_Y + app_name_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_APP_NAME, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-        mtx1.lock();
+-        stream.str("");
+-        stream << "Total Time: " << fixed << setprecision(1) << sum_total_time <<" ms";
+-        str = stream.str();
+-        Size tot_time_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_LARGE, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - tot_time_size.width - RIGHT_ALIGN_OFFSET), (T_TIME_STR_Y + tot_time_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - tot_time_size.width - RIGHT_ALIGN_OFFSET), (T_TIME_STR_Y + tot_time_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_LARGE, Scalar(0, 255, 0), HC_CHAR_THICKNESS);
+-                        
+-        stream.str("");
+-        stream << "Pre-Proc: " << fixed << setprecision(1)<< sum_pre_poc_time<<" ms";
+-        str = stream.str();
+-        Size pre_proc_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - pre_proc_size.width - RIGHT_ALIGN_OFFSET), (PRE_TIME_STR_Y + pre_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - pre_proc_size.width - RIGHT_ALIGN_OFFSET), (PRE_TIME_STR_Y + pre_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-
+-        stream.str("");
+-        stream << "Inference: "<< fixed << setprecision(1) << sum_inf_time<<" ms";
+-        str = stream.str();
+-        Size inf_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - inf_size.width - RIGHT_ALIGN_OFFSET), (I_TIME_STR_Y + inf_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - inf_size.width - RIGHT_ALIGN_OFFSET), (I_TIME_STR_Y + inf_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-        
+-        stream.str("");
+-        stream << "Post-Proc: "<< fixed << setprecision(1) << sum_post_proc_time<<" ms";
++        stream << "FPS: " << fixed << setprecision(2)<< fps;
+         str = stream.str();
+-        Size post_proc_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_SMALL, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((DISP_OUTPUT_WIDTH - post_proc_size.width - RIGHT_ALIGN_OFFSET), (P_TIME_STR_Y + post_proc_size.height)), FONT_HERSHEY_SIMPLEX, 
+-                        CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
+-        mtx1.unlock();
+-        stream.str("");
+-        stream << "Temperature1: "<< fixed <<setprecision(1) << tmp << "C";
+-        str = stream.str();
+-        Size temp_size = getTextSize(str, FONT_HERSHEY_SIMPLEX,CHAR_SCALE_LARGE, HC_CHAR_THICKNESS, &baseline);
+-        putText(output_image, str,Point((DISP_INF_WIDTH - temp_size.width - RIGHT_ALIGN_OFFSET), (960 + temp_size.height)), FONT_HERSHEY_SIMPLEX,
+-                    CHAR_SCALE_LARGE, Scalar(0, 0, 0), 1.5*HC_CHAR_THICKNESS);
+-        putText(output_image, str,Point((DISP_INF_WIDTH - temp_size.width - RIGHT_ALIGN_OFFSET), (960 + temp_size.height)), FONT_HERSHEY_SIMPLEX,
+-                    CHAR_SCALE_LARGE, Scalar(255, 255, 255), HC_CHAR_THICKNESS);
 -        cv::Mat bgra_image;
 -        cv::cvtColor(output_image, bgra_image, cv::COLOR_BGR2BGRA);
 -
 -        memcpy(img_buffer0, bgra_image.data, DISP_OUTPUT_WIDTH * DISP_OUTPUT_HEIGHT * BGRA_CHANNEL);
 -        wayland.commit(img_buffer0, NULL);
- 
-+        if (VEHICLE_COUNT >= 1)
+-
++        putText(combined_image, str,Point(FPS_STR_X, FPS_STR_Y), FONT_HERSHEY_SIMPLEX, CHAR_SCALE_SMALL, Scalar(255, 255, 255), HC_CHAR_THICKNESS);    
++        cv::imshow("Output Image", combined_image);
++        char key = (char) cv::waitKey(1);
++        if (key == 'q' || key == 27) 
 +        {
-+            
-+            std::string filename = output_dir + "/output" + std::to_string(frame_count++) + ".jpg";
-+            Mat combined_image = combineFrames(img_frames, IMAGE_WIDTH, IMAGE_HEIGHT); 
-+            if (!combined_image.empty()) {
-+                imwrite(filename, combined_image); 
-+            }
-+            std::cout << "[INFO] Saved frame with VEHICLE_COUNT >= 1 as " << filename << std::endl;
-+        
++            break;
 +        }
-+       
          img_processing_start.store(0);
      }/*End of Loop*/
      goto main_proc_end;
-@@ -1419,7 +1449,6 @@ err:
+@@ -1419,7 +1441,6 @@ err:
  /*Main Processing Termination*/
  main_proc_end:
      printf("Main Process Terminated\n");
@@ -134,10 +366,48 @@ index da402a2..c917d81 100644
      return main_ret;
  }
  
-@@ -1741,15 +1770,7 @@ int main(int argc, char *argv[])
-                 {
-                 gstreamer_pipeline.push_back("v4l2src device=" + device_paths[i] + " ! video/x-raw, width=640, height=480, framerate=10/1 ! videoconvert ! appsink -v");
+@@ -1460,9 +1481,9 @@ int main(int argc, char *argv[])
+         OCA_list[i] = 0;    //disable
+     }
+     OCA_Activate( &OCA_list[0] );
+-
++    
+     if (strcmp(argv[1],"USB")==0 || strcmp(argv[1],"MIPI")==0)
+-    {   
++    {  
+         if(argc ==2)
+         {
+             cout<<"enter number of cameras as third argument";
+@@ -1487,7 +1508,7 @@ int main(int argc, char *argv[])
+             else
+             {
+                 if(strcmp(argv[2],"1")==0 || strcmp(argv[2],"2")==0 || strcmp(argv[2],"3")==0 || strcmp(argv[2],"4")==0)
+-                {
++        {
+                     number_of_cameras=atoi(argv[2]);
+                     flip_mode=0;
+                     drpai_freq = DRPAI_FREQ;
+@@ -1626,9 +1647,9 @@ int main(int argc, char *argv[])
+                     goto end_close_drpai;
                  }
+ 
+-            }
+-            else 
+-            {
++    }
++    else
++    {
+                 cout<<"enter integer in range"<<endl;
+                 goto end_close_drpai;
+             } 
+@@ -1738,18 +1759,10 @@ int main(int argc, char *argv[])
+             if(status ==1)
+             {
+                 for(i=0;i<number_of_cameras;i++)
+-                {
++            {
+                 gstreamer_pipeline.push_back("v4l2src device=" + device_paths[i] + " ! video/x-raw, width=640, height=480, framerate=10/1 ! videoconvert ! appsink -v");
+-                }
 -                /* Initialize waylad */
 -                ret = wayland.init(DISP_OUTPUT_WIDTH, DISP_OUTPUT_HEIGHT, BGRA_CHANNEL);
 -                if(0 != ret)
@@ -147,11 +417,21 @@ index da402a2..c917d81 100644
 -                    goto end_close_drpai;
 -                }
 -
-+                
++            }
++            
                  /*Termination Request Semaphore Initialization*/
                  /*Initialized value at 1.*/
                  sem_create = sem_init(&terminate_req_sem, 0, 1);
-@@ -1862,15 +1883,7 @@ int main(int argc, char *argv[])
+@@ -1818,7 +1831,7 @@ int main(int argc, char *argv[])
+                 {
+                 gstreamer_pipeline.push_back("v4l2src device=" + device_paths[i] + " ! video/x-raw, width=640, height=480, framerate=30/1 ! videoconvert ! appsink -v");
+                 }
+-                
++            
+                 for(i=0;i<number_of_cameras;i++)
+                 {
+                     white_space="";
+@@ -1862,66 +1875,58 @@ int main(int argc, char *argv[])
                      std::system(command.c_str());
                      }                    
                  }
@@ -164,17 +444,121 @@ index da402a2..c917d81 100644
 -                    goto end_close_drpai;
 -                }
 -
+-                /*Termination Request Semaphore Initialization*/
+-                /*Initialized value at 1.*/
+-                sem_create = sem_init(&terminate_req_sem, 0, 1);
+-                if (0 != sem_create)
+-                {
+-                    fprintf(stderr, "[ERROR] Failed to Initialize Termination Request Semaphore.\n");
+-                    ret_main = -1;
+-                    goto end_threads;
+-                }
+-                /*Create Key Hit Thread*/
+-                create_thread_key = pthread_create(&kbhit_thread, NULL, R_Kbhit_Thread, NULL);
+-                if (0 != create_thread_key)
+-                {
+-                    fprintf(stderr, "[ERROR] Failed to create Key Hit Thread.\n");
+-                    ret_main = -1;
+-                    goto end_threads;
+-                }
+-                /*Create Inference Thread*/
+-                create_thread_ai = pthread_create(&ai_inf_thread, NULL, R_Inf_Thread, NULL);
+-                if (0 != create_thread_ai)
+-                {
+-                    sem_trywait(&terminate_req_sem);
+-                    fprintf(stderr, "[ERROR] Failed to create AI Inference Thread.\n");
+-                    ret_main = -1;
+-                    goto end_threads;
+-                }
+-                /*Create Capture Thread*/
+-                create_thread_capture = pthread_create(&capture_thread, NULL, R_Capture_Thread, NULL);
+-                if (0 != create_thread_capture)
+-                {
+-                    sem_trywait(&terminate_req_sem);
+-                    fprintf(stderr, "[ERROR] Failed to create Capture Thread.\n");
+-                    ret_main = -1;
+-                    goto end_threads;
+-                }
+-                /*Create Memory Copy Thread*/
+-                create_thread_memcpy = pthread_create(&memcpy_thread, NULL, R_Memcpy_Thread, NULL);
+-                if (0 != create_thread_memcpy)
+-                {
+-                    sem_trywait(&terminate_req_sem);
+-                    fprintf(stderr, "[ERROR] Failed to create Memory Copy Thread.\n");
+-                    ret_main = -1;
+-                    goto end_threads;
+-                }
 +               
-                 /*Termination Request Semaphore Initialization*/
-                 /*Initialized value at 1.*/
-                 sem_create = sem_init(&terminate_req_sem, 0, 1);
-@@ -1978,9 +1991,6 @@ end_threads:
++            /*Termination Request Semaphore Initialization*/
++            /*Initialized value at 1.*/
++            sem_create = sem_init(&terminate_req_sem, 0, 1);
++            if (0 != sem_create)
++            {
++                fprintf(stderr, "[ERROR] Failed to Initialize Termination Request Semaphore.\n");
++                ret_main = -1;
++                goto end_threads;
++            }
++            /*Create Key Hit Thread*/
++            create_thread_key = pthread_create(&kbhit_thread, NULL, R_Kbhit_Thread, NULL);
++            if (0 != create_thread_key)
++            {
++                fprintf(stderr, "[ERROR] Failed to create Key Hit Thread.\n");
++                ret_main = -1;
++                goto end_threads;
++            }
++            /*Create Inference Thread*/
++            create_thread_ai = pthread_create(&ai_inf_thread, NULL, R_Inf_Thread, NULL);
++            if (0 != create_thread_ai)
++            {
++                sem_trywait(&terminate_req_sem);
++                fprintf(stderr, "[ERROR] Failed to create AI Inference Thread.\n");
++                ret_main = -1;
++                goto end_threads;
++            }
++            /*Create Capture Thread*/
++            create_thread_capture = pthread_create(&capture_thread, NULL, R_Capture_Thread, NULL);
++            if (0 != create_thread_capture)
++            {
++                sem_trywait(&terminate_req_sem);
++                fprintf(stderr, "[ERROR] Failed to create Capture Thread.\n");
++                ret_main = -1;
++                goto end_threads;
++            }
++            /*Create Memory Copy Thread*/
++            create_thread_memcpy = pthread_create(&memcpy_thread, NULL, R_Memcpy_Thread, NULL);
++            if (0 != create_thread_memcpy)
++            {
++                sem_trywait(&terminate_req_sem);
++                fprintf(stderr, "[ERROR] Failed to create Memory Copy Thread.\n");
++                ret_main = -1;
++                goto end_threads;
++            }
+             }
+             else
+             {
+                 cout<<"unable to get device paths"<<endl;
+                 goto end_close_drpai;
+-            }
+-            break;
++        }
++        break;
+         }
+     }
+ 
+@@ -1978,8 +1983,7 @@ end_threads:
          sem_destroy(&terminate_req_sem);
      }
  
 -    /* Exit the program */
 -    wayland.exit();
--
++   
+ 
      goto end_free_malloc;
  end_free_malloc:
-     free(drpai_buf);
+@@ -2011,4 +2015,4 @@ end_close_drpai:
+ end_main:
+     printf("Application End\n");
+     return ret_main;
+-}
++}
+\ No newline at end of file
