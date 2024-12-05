@@ -117,7 +117,7 @@ On the board terminal, execute the application with the following command, speci
 
 - **Image Input**:
     ```sh
-    ./head_count_topview_app IMAGE ../img/sample.jpeg
+    ./head_count_topview_app IMAGE <path_to_the_image>
     ```
 
 - **USB Camera Input**:
@@ -201,7 +201,7 @@ On the board terminal, execute the application with the following command, speci
 
 - **Image Input**:
     ```sh
-    ./animal_detection_app IMAGE ../img/sample.jpeg
+    ./animal_detection_app IMAGE <path_to_the_image>
     ```
 
 - **USB Camera Input**:
@@ -210,6 +210,11 @@ On the board terminal, execute the application with the following command, speci
     ```
 
 # Multi camera vehicle detection Application
+
+<img src="./multi_camera_vehicle_detection/output_image.jpg" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
 
 This application is used to detect 10 types of vehicles below from camera input.  
 Also it can be used for these vehicles at 360 angle with multi cameras.
@@ -270,14 +275,23 @@ For the ease of deployment all the deployables file and folders are provided on 
 ## Run the Application
 To run the application on the Kakip board:
 
-On the board terminal, execute the application with the following command, specifying the number cameras in the 2nd argument:
+On the board terminal, execute the application with the following command, specifying the number cameras as the 2nd argument and use 'FLIP' as the third argument if you want to flip the output. 
 
-- **USB Camera Input**:
+- **Application with USB Camera Input**:
     ```sh
     ./multi_camera_vehicle_detection_app USB 2
     ```
+- **Application with USB Camera Input with flip mode**:
+    ```sh
+    ./multi_camera_vehicle_detection_app USB 2 FLIP
+    ```
 
 # Hand gesture recognition Application
+
+<img src="./Hand_gesture/output_image.png" alt="Sample application output"
+     margin-right=10px; 
+     width=600px;
+     height=334px />
 
 This application is not covered with MIT license. This application is licensed with Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) license.
 Please have a look at dos and dont's here : [Creative commons website link](https://creativecommons.org/licenses/by-sa/4.0/deed.en)
